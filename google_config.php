@@ -120,9 +120,17 @@ function get_config_val($key, $default = null) {
     return $default;
 }
 
+// Dynamically resolve default redirect URI based on active host and protocol
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+    || (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
+    ? 'https' : 'http';
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost:6767';
+$auto_redirect_uri = "{$protocol}://{$host}/google_callback.php";
+
 $GOOGLE_CLIENT_ID = get_config_val("G_CLIENT_ID");
 $GOOGLE_CLIENT_SECRET = get_config_val("G_CLIENT_SECRET");
-$GOOGLE_AUTH_URI = get_config_val("G_AUTH_URI");
+$GOOGLE_AUTH_URI = get_config_val("G_AUTH_URI", $auto_redirect_uri);
 $GOOGLE_REDIRECT_URI = $GOOGLE_AUTH_URI;
 $GOOGLE_CURL_CA_BUNDLE = get_config_val("G_CURL_CA_BUNDLE");
 $allow_insecure_env = get_config_val("G_ALLOW_INSECURE_SSL");
