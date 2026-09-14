@@ -19,15 +19,13 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 FROM php:8.2-apache
 
-# Install system dependencies: ExifTool, GD image libraries, and Python
+# Install system dependencies: ExifTool and GD image libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libimage-exiftool-perl \
     libpng-dev \
     libjpeg-dev \
     libwebp-dev \
     libfreetype6-dev \
-    python3 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure and compile PHP GD extension with full format support
