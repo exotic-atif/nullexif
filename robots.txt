@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /uploads/
+Disallow: /process.php
+Disallow: /google_login.php
+Disallow: /google_callback.php
+Disallow: /google_status.php
+Disallow: /google_refresh.php
+Disallow: /google_logout.php
+Disallow: /upload_to_photos.php
+
+Sitemap: https://nullexif.onrender.com/sitemap.xml
