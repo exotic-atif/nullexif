@@ -1,0 +1,84 @@
+# ==========================================
+# Version Control & Local Config
+# ==========================================
+.git
+.gitignore
+.gitattributes
+
+# ==========================================
+# Sensitive Information & Credentials
+# ==========================================
+.env
+.env.*
+*.env
+google_auth_token.txt
+*token*.txt
+*token*.json
+*secret*.json
+client_secret*.json
+credentials*.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.cert
+*.crt
+
+# ==========================================
+# Explicitly Ignored Folders
+# ==========================================
+reference/
+
+# ==========================================
+# User Uploads & Media
+# ==========================================
+uploads/
+
+# ==========================================
+# Node & Build Artifacts
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================================
+# Python Artifacts & Virtual Environments
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+
+# ==========================================
+# Logs, Sessions & Temp Files
+# ==========================================
+*.log
+logs/
+sessions/
+tmp/
+temp/
+
+# ==========================================
+# Documentation & Local Scripts
+# ==========================================
+README.md
+changes.md
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+start-server.bat
+
+# ==========================================
+# OS & IDE Files
+# ==========================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/

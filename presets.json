@@ -1,0 +1,18 @@
+{
+    "Tanu's Phone": {
+        "EXIF:Make": "Samsung",
+        "EXIF:Model": "Galaxy M14 5G",
+        "EXIF:Artist": "Tanu",
+        "EXIF:Copyright": "© Tanu",
+        "EXIF:UserComment": "Captured on Tanu's phone",
+        "EXIF:Software": "M146BXXUBDYL1"
+    },
+    "Atif's Phone": {
+        "EXIF:Make": "Samsung",
+        "EXIF:Model": "Galaxy A55 5G",
+        "EXIF:Artist": "Atif",
+        "EXIF:Copyright": "© Atif",
+        "EXIF:UserComment": "Captured on Atif's phone",
+        "EXIF:Software": "A556EXXSDCZB5"
+    }
+}
