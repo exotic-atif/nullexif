@@ -55,7 +55,7 @@ if (isset($_GET['code'])) {
             }
         }
 
-        // Save to file for permanent local storage
+        // Store tokens securely in user's isolated PHP session
         $saved = save_tokens([
             'access_token' => $token_data['access_token'],
             'refresh_token' => $refresh_token,
@@ -64,13 +64,8 @@ if (isset($_GET['code'])) {
             'user_email' => $user_email
         ]);
         if ($saved === false) {
-            $auth_error = 'Failed to persist token file';
+            $auth_error = 'Failed to store session tokens';
         } else {
-            // Also update session for this request
-            $_SESSION['google_access_token'] = $token_data['access_token'];
-            if ($refresh_token) $_SESSION['google_refresh_token'] = $refresh_token;
-            $_SESSION['google_token_expiry'] = $expiry;
-            $_SESSION['google_authenticated'] = true;
             $auth_success = true;
         }
     } else {

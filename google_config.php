@@ -1,66 +1,80 @@
 <?php
 /**
- * Simple Token Store (Development Only)
- * Stores Google OAuth tokens in a local text file (JSON payload).
+ * Session-based Token Store
+ * Stores Google OAuth tokens in the user's isolated PHP session.
+ * Eliminates plain-text files on disk and prevents multi-user session collision.
  */
 
-$TOKEN_FILE = __DIR__ . '/google_auth_token.txt';
-$LEGACY_TOKEN_FILE = __DIR__ . '/.google_tokens.json';
+// Configure secure session cookie parameters
+if (session_status() === PHP_SESSION_NONE) {
+    $is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        || (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+
+    session_set_cookie_params([
+        'lifetime' => 0, // Session cookie lasts until browser is closed
+        'path' => '/',
+        'domain' => '',
+        'secure' => $is_https,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
 
 function get_stored_tokens() {
-    global $TOKEN_FILE, $LEGACY_TOKEN_FILE;
-    $candidates = [$TOKEN_FILE, $LEGACY_TOKEN_FILE];
+    if (!empty($_SESSION['google_tokens']) && is_array($_SESSION['google_tokens'])) {
+        return $_SESSION['google_tokens'];
+    }
 
-    foreach ($candidates as $file) {
-        if (!file_exists($file)) {
-            continue;
-        }
-
-        $raw = @file_get_contents($file);
-        if ($raw === false || trim($raw) === '') {
-            continue;
-        }
-
-        $decoded = json_decode($raw, true);
-        if (is_array($decoded)) {
-            return $decoded;
-        }
+    if (!empty($_SESSION['google_access_token']) || !empty($_SESSION['google_refresh_token'])) {
+        return [
+            'access_token' => $_SESSION['google_access_token'] ?? null,
+            'refresh_token' => $_SESSION['google_refresh_token'] ?? null,
+            'token_expiry' => $_SESSION['google_token_expiry'] ?? 0,
+            'user_email' => $_SESSION['google_user_email'] ?? null,
+            'authenticated' => !empty($_SESSION['google_authenticated'])
+        ];
     }
 
     return null;
 }
 
 function save_tokens($data) {
-    global $TOKEN_FILE, $LEGACY_TOKEN_FILE;
+    if (!is_array($data)) {
+        return false;
+    }
+
     $existing = get_stored_tokens() ?: [];
-    $new_data = array_merge($existing, $data);
-    $encoded = json_encode($new_data, JSON_PRETTY_PRINT);
+    $merged = array_merge($existing, $data);
+    $_SESSION['google_tokens'] = $merged;
 
-    if ($encoded === false) {
-        return false;
+    if (isset($merged['access_token'])) {
+        $_SESSION['google_access_token'] = $merged['access_token'];
     }
-
-    $written = @file_put_contents($TOKEN_FILE, $encoded, LOCK_EX);
-    if ($written === false) {
-        return false;
+    if (isset($merged['refresh_token'])) {
+        $_SESSION['google_refresh_token'] = $merged['refresh_token'];
     }
-
-    // Cleanup legacy file after successful write to the new text file.
-    if (file_exists($LEGACY_TOKEN_FILE)) {
-        @unlink($LEGACY_TOKEN_FILE);
+    if (isset($merged['token_expiry'])) {
+        $_SESSION['google_token_expiry'] = $merged['token_expiry'];
     }
+    if (isset($merged['user_email'])) {
+        $_SESSION['google_user_email'] = $merged['user_email'];
+    }
+    $_SESSION['google_authenticated'] = !empty($_SESSION['google_access_token']) || !empty($_SESSION['google_refresh_token']);
 
     return true;
 }
 
 function clear_stored_tokens() {
-    global $TOKEN_FILE, $LEGACY_TOKEN_FILE;
-    if (file_exists($TOKEN_FILE)) {
-        @unlink($TOKEN_FILE);
-    }
-    if (file_exists($LEGACY_TOKEN_FILE)) {
-        @unlink($LEGACY_TOKEN_FILE);
-    }
+    unset(
+        $_SESSION['google_tokens'],
+        $_SESSION['google_access_token'],
+        $_SESSION['google_refresh_token'],
+        $_SESSION['google_token_expiry'],
+        $_SESSION['google_authenticated'],
+        $_SESSION['google_user_email']
+    );
 }
 
 function hydrate_session_from_tokens() {
@@ -72,38 +86,47 @@ function hydrate_session_from_tokens() {
     $_SESSION['google_access_token'] = $tokens['access_token'] ?? null;
     $_SESSION['google_refresh_token'] = $tokens['refresh_token'] ?? null;
     $_SESSION['google_token_expiry'] = $tokens['token_expiry'] ?? 0;
-    $_SESSION['google_authenticated'] = !empty($tokens['access_token']) || !empty($tokens['refresh_token']);
+    $_SESSION['google_user_email'] = $tokens['user_email'] ?? null;
+    $_SESSION['google_authenticated'] = !empty($_SESSION['google_access_token']) || !empty($_SESSION['google_refresh_token']);
 
     return $_SESSION['google_authenticated'] === true;
 }
 
-// Ensure session is started for other parts of the app, but we'll use the file too
-session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-
-// Load .env
+// Load .env for local development if present (environment variables from host/Render take precedence)
 $env_path = __DIR__ . '/.env';
 if (file_exists($env_path)) {
     $lines = file($env_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
+        $trimmed = trim($line);
+        if ($trimmed === '' || strpos($trimmed, '#') === 0) continue;
         if (strpos($line, '=') !== false) {
             list($name, $value) = explode('=', $line, 2);
-            putenv(trim($name) . "=" . trim($value));
+            $name = trim($name);
+            $value = trim($value);
+            if (getenv($name) === false) {
+                putenv("$name=$value");
+                $_ENV[$name] = $value;
+                $_SERVER[$name] = $value;
+            }
         }
     }
 }
 
-$GOOGLE_CLIENT_ID = getenv("G_CLIENT_ID");
-$GOOGLE_CLIENT_SECRET = getenv("G_CLIENT_SECRET");
-$GOOGLE_AUTH_URI = getenv("G_AUTH_URI");
-$GOOGLE_REDIRECT_URI = $GOOGLE_AUTH_URI;
-$GOOGLE_CURL_CA_BUNDLE = getenv("G_CURL_CA_BUNDLE");
-$allow_insecure_env = getenv("G_ALLOW_INSECURE_SSL");
-$GOOGLE_ALLOW_INSECURE_SSL = $allow_insecure_env === false ? true : strtolower((string)$allow_insecure_env) === 'true';
+function get_config_val($key, $default = null) {
+    $val = getenv($key);
+    if ($val !== false && $val !== '') return $val;
+    if (isset($_ENV[$key]) && $_ENV[$key] !== '') return $_ENV[$key];
+    if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return $_SERVER[$key];
+    return $default;
+}
 
-// Auto-sync from file to session if needed
-hydrate_session_from_tokens();
+$GOOGLE_CLIENT_ID = get_config_val("G_CLIENT_ID");
+$GOOGLE_CLIENT_SECRET = get_config_val("G_CLIENT_SECRET");
+$GOOGLE_AUTH_URI = get_config_val("G_AUTH_URI");
+$GOOGLE_REDIRECT_URI = $GOOGLE_AUTH_URI;
+$GOOGLE_CURL_CA_BUNDLE = get_config_val("G_CURL_CA_BUNDLE");
+$allow_insecure_env = get_config_val("G_ALLOW_INSECURE_SSL");
+$GOOGLE_ALLOW_INSECURE_SSL = $allow_insecure_env === null ? true : strtolower((string)$allow_insecure_env) === 'true';
 
 function configure_google_curl($ch) {
     global $GOOGLE_CURL_CA_BUNDLE, $GOOGLE_ALLOW_INSECURE_SSL;

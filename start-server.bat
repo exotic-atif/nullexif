@@ -1,5 +1,5 @@
 @echo off
-title NullExif Server (v2.0.2)
+title NullExif Server (v2.1.0)
 if not exist "dist\bundle.js" (
     echo Building frontend assets...
     call npm run build

@@ -55,7 +55,7 @@ if ($expiry > 0 && time() > $expiry - 60) {
     perform_refresh();
 }
 
-if (basename($_SERVER['SCRIPT_FILENAME']) == 'google_refresh.php') {
+if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') == 'google_refresh.php') {
     header('Content-Type: application/json');
     echo json_encode(['success' => true]);
     exit;
