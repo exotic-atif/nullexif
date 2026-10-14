@@ -27,13 +27,49 @@ if (!$accessToken) {
 $action = $_GET['action'] ?? '';
 $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
+/**
+ * Validate that a target upload file strictly resides inside the uploads/ directory
+ * and has a valid photo extension, preventing path traversal and arbitrary file upload.
+ */
+function validate_upload_path($relativePath) {
+    if (empty($relativePath) || !is_string($relativePath)) {
+        return false;
+    }
+
+    $uploadsDir = realpath(__DIR__ . '/uploads');
+    $realPath = realpath($relativePath);
+
+    if (!$uploadsDir || !$realPath || !file_exists($realPath)) {
+        return false;
+    }
+
+    // Prevent directory traversal attacks (uploads/../)
+    if (strpos($realPath, $uploadsDir . DIRECTORY_SEPARATOR) !== 0) {
+        return false;
+    }
+
+    if (!is_file($realPath)) {
+        return false;
+    }
+
+    // Restrict strictly to valid image file types
+    $ext = strtolower(pathinfo($realPath, PATHINFO_EXTENSION));
+    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'tiff', 'tif', 'avif'];
+    if (!in_array($ext, $allowed, true)) {
+        return false;
+    }
+
+    return $realPath;
+}
+
 // 1. Action: Start Resumable Upload Session
 if ($action === 'start_resumable') {
-    $filePath = $data['path'] ?? '';
-    if (strpos($filePath, 'uploads/') !== 0 || !file_exists($filePath)) {
-        echo json_encode(['error' => 'Invalid file path or file not found']);
+    $validatedPath = validate_upload_path($data['path'] ?? '');
+    if (!$validatedPath) {
+        echo json_encode(['error' => 'Invalid file path or file not permitted']);
         exit;
     }
+    $filePath = $validatedPath;
 
     $fileName = basename($filePath);
     $fileSize = filesize($filePath);
@@ -126,11 +162,12 @@ if ($action === 'create_media_item') {
 }
 
 // 3. Fallback / Standard direct upload
-$filePath = $data['path'] ?? '';
-if (strpos($filePath, 'uploads/') !== 0 || !file_exists($filePath)) {
-    echo json_encode(['error' => 'Invalid file path or file not found']);
+$validatedPath = validate_upload_path($data['path'] ?? '');
+if (!$validatedPath) {
+    echo json_encode(['error' => 'Invalid file path or file not permitted']);
     exit;
 }
+$filePath = $validatedPath;
 
 $fileName = !empty($data['file_name']) ? basename($data['file_name']) : basename($filePath);
 

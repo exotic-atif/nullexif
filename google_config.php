@@ -7,6 +7,9 @@
 
 // Configure secure session cookie parameters
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', '1');
+    ini_set('session.use_only_cookies', '1');
+
     $is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
         || (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
@@ -125,7 +128,13 @@ $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
     || (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
     ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost:6767';
+
+// Sanitize host header to prevent host-header injection attacks
+$raw_host = $_SERVER['HTTP_HOST'] ?? 'localhost:6767';
+$host = preg_replace('/[^a-zA-Z0-9\.\-:]/', '', $raw_host);
+if (empty($host)) {
+    $host = 'localhost:6767';
+}
 $auto_redirect_uri = "{$protocol}://{$host}/google_callback.php";
 
 $GOOGLE_CLIENT_ID = get_config_val("G_CLIENT_ID");
@@ -133,8 +142,10 @@ $GOOGLE_CLIENT_SECRET = get_config_val("G_CLIENT_SECRET");
 $GOOGLE_AUTH_URI = get_config_val("G_AUTH_URI", $auto_redirect_uri);
 $GOOGLE_REDIRECT_URI = $GOOGLE_AUTH_URI;
 $GOOGLE_CURL_CA_BUNDLE = get_config_val("G_CURL_CA_BUNDLE");
+
+// Security default: NEVER disable SSL verification unless explicitly configured via environment
 $allow_insecure_env = get_config_val("G_ALLOW_INSECURE_SSL");
-$GOOGLE_ALLOW_INSECURE_SSL = $allow_insecure_env === null ? true : strtolower((string)$allow_insecure_env) === 'true';
+$GOOGLE_ALLOW_INSECURE_SSL = strtolower((string)$allow_insecure_env) === 'true';
 
 function configure_google_curl($ch) {
     global $GOOGLE_CURL_CA_BUNDLE, $GOOGLE_ALLOW_INSECURE_SSL;
@@ -147,14 +158,13 @@ function configure_google_curl($ch) {
         return;
     }
 
-    // Safe defaults.
+    // Safe production defaults: strictly verify SSL peer and host.
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
-    // Localhost dev fallback when machine CA chain is broken.
-    $host = $_SERVER['HTTP_HOST'] ?? '';
-    $is_localhost = stripos($host, 'localhost') !== false || stripos($host, '127.0.0.1') !== false;
-    if ($is_localhost && $GOOGLE_ALLOW_INSECURE_SSL) {
+    // Only allow insecure SSL if explicitly configured in environment AND running under local PHP dev server
+    $is_local_dev = php_sapi_name() === 'cli-server';
+    if ($is_local_dev && $GOOGLE_ALLOW_INSECURE_SSL) {
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
     }

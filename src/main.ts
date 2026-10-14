@@ -120,6 +120,11 @@ class NullExifApp {
 
   private setupOAuthListener(): void {
     window.addEventListener('message', async (event) => {
+      // Strictly enforce same-origin to prevent spoofed auth messages
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
       if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
         await this.refreshGoogleStatus();
       } else if (event.data?.type === 'GOOGLE_AUTH_FAILED') {

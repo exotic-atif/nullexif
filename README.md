@@ -1,4 +1,4 @@
-# NullExif (v2.0.0)
+# NullExif (v2.1.1)
 
 > High-Precision Photo Metadata Engineering Suite • Part of **The Null Projects**
 
